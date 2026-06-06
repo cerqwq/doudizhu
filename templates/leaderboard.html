@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排行榜 - 斗地主</title>
+    <link rel="stylesheet" href="/ddz/static/style.css">
+    <style>
+        .leaderboard-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: 15px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .leaderboard-table th {
+            background: rgba(0, 0, 0, 0.5);
+            color: #ffd700;
+            font-size: 1.1em;
+        }
+        .leaderboard-table tr:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .rank-1 { color: #ffd700; font-weight: bold; font-size: 1.2em; }
+        .rank-2 { color: #c0c0c0; font-weight: bold; }
+        .rank-3 { color: #cd7f32; font-weight: bold; }
+        .rank-badge {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .rank-1 .rank-badge { background: #ffd700; color: #000; }
+        .rank-2 .rank-badge { background: #c0c0c0; color: #000; }
+        .rank-3 .rank-badge { background: #cd7f32; color: #000; }
+        .back-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: transform 0.2s;
+        }
+        .back-btn:hover {
+            transform: scale(1.05);
+        }
+        .stats-summary {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .stat-card {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 150px;
+        }
+        .stat-value {
+            font-size: 2em;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .stat-label {
+            color: #aaa;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="leaderboard-container">
+        <h1 style="text-align: center; color: #ffd700; margin-bottom: 30px;">
+            🏆 排行榜
+        </h1>
+
+        <div class="stats-summary" id="statsSummary">
+            <div class="stat-card">
+                <div class="stat-value" id="totalPlayers">-</div>
+                <div class="stat-label">总玩家数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalGames">-</div>
+                <div class="stat-label">总对局数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalCoins">-</div>
+                <div class="stat-label">总金币流通</div>
+            </div>
+        </div>
+
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>玩家</th>
+                    <th>金币</th>
+                    <th>胜场</th>
+                    <th>负场</th>
+                    <th>胜率</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px;">
+                        加载中...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="text-align: center;">
+            <a href="/ddz/nav" class="back-btn">返回大厅</a>
+        </div>
+    </div>
+
+    <script>
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch('/ddz/api/leaderboard');
+                const data = await response.json();
+
+                if (data.success) {
+                    renderLeaderboard(data.leaderboard);
+                    updateStats(data.leaderboard);
+                } else {
+                    document.getElementById('leaderboardBody').innerHTML =
+                        '<tr><td colspan="6" style="text-align: center; color: #ff6b6b;">加载失败</td></tr>';
+                }
+            } catch (error) {
+                console.error('加载排行榜失败:', error);
+                document.getElementById('leaderboardBody').innerHTML =
+                    '<tr><td colspan="6" style="text-align: center; color: #ff6b6b;">网络错误</td></tr>';
+            }
+        }
+
+        function renderLeaderboard(leaderboard) {
+            const tbody = document.getElementById('leaderboardBody');
+
+            if (!leaderboard || leaderboard.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">暂无数据</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = leaderboard.map((player, index) => {
+                const rank = index + 1;
+                const rankClass = rank <= 3 ? `rank-${rank}` : '';
+                const winRate = player.total_games > 0
+                    ? ((player.wins / player.total_games) * 100).toFixed(1)
+                    : '0.0';
+
+                return `
+                    <tr class="${rankClass}">
+                        <td>
+                            <span class="rank-badge">${rank}</span>
+                        </td>
+                        <td>${escapeHtml(player.username)}</td>
+                        <td>${formatNumber(player.coins)}</td>
+                        <td>${player.wins}</td>
+                        <td>${player.losses}</td>
+                        <td>${winRate}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateStats(leaderboard) {
+            const totalPlayers = leaderboard.length;
+            const totalGames = leaderboard.reduce((sum, p) => sum + (p.total_games || 0), 0);
+            const totalCoins = leaderboard.reduce((sum, p) => sum + (p.coins || 0), 0);
+
+            document.getElementById('totalPlayers').textContent = totalPlayers;
+            document.getElementById('totalGames').textContent = formatNumber(totalGames);
+            document.getElementById('totalCoins').textContent = formatNumber(totalCoins);
+        }
+
+        function formatNumber(num) {
+            if (num >= 10000) {
+                return (num / 10000).toFixed(1) + '万';
+            }
+            return num.toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 加载排行榜
+        loadLeaderboard();
+    </script>
+</body>
+</html>
