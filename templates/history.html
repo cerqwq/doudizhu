@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏记录 - 斗地主</title>
+    <link rel="stylesheet" href="/ddz/static/style.css">
+    <style>
+        .history-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .history-table th,
+        .history-table td {
+            padding: 12px 15px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .history-table th {
+            background: rgba(0, 0, 0, 0.5);
+            color: #ffd700;
+            font-size: 1.1em;
+        }
+        .history-table tr:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .result-win {
+            color: #4ade80;
+            font-weight: bold;
+        }
+        .result-loss {
+            color: #f87171;
+            font-weight: bold;
+        }
+        .result-draw {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        .coins-positive {
+            color: #4ade80;
+        }
+        .coins-negative {
+            color: #f87171;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: transform 0.2s;
+        }
+        .back-btn:hover {
+            transform: scale(1.05);
+        }
+        .summary-cards {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .summary-card {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 120px;
+        }
+        .summary-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .summary-label {
+            color: #aaa;
+            margin-top: 5px;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="history-container">
+        <h1 style="text-align: center; color: #ffd700; margin-bottom: 30px;">
+            📊 游戏记录
+        </h1>
+
+        <div class="summary-cards" id="summaryCards">
+            <div class="summary-card">
+                <div class="summary-value" id="totalGames" style="color: #667eea;">-</div>
+                <div class="summary-label">总场次</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="winCount" style="color: #4ade80;">-</div>
+                <div class="summary-label">胜利</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="lossCount" style="color: #f87171;">-</div>
+                <div class="summary-label">失败</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="winRate" style="color: #fbbf24;">-</div>
+                <div class="summary-label">胜率</div>
+            </div>
+        </div>
+
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>结果</th>
+                    <th>金币变化</th>
+                    <th>模式</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody">
+                <tr>
+                    <td colspan="4" class="no-data">加载中...</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="text-align: center;">
+            <a href="/ddz/profile" class="back-btn">返回个人中心</a>
+        </div>
+    </div>
+
+    <script>
+        async function loadHistory() {
+            try {
+                const response = await fetch('/ddz/api/game_history');
+                const data = await response.json();
+
+                if (data.success) {
+                    renderHistory(data.history);
+                    updateSummary(data.history);
+                } else {
+                    document.getElementById('historyBody').innerHTML =
+                        '<tr><td colspan="4" class="no-data">加载失败</td></tr>';
+                }
+            } catch (error) {
+                console.error('加载历史记录失败:', error);
+                document.getElementById('historyBody').innerHTML =
+                    '<tr><td colspan="4" class="no-data">网络错误</td></tr>';
+            }
+        }
+
+        function renderHistory(history) {
+            const tbody = document.getElementById('historyBody');
+
+            if (!history || history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-data">暂无游戏记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = history.map(record => {
+                const resultClass = `result-${record.result}`;
+                const resultText = record.result === 'win' ? '胜利' :
+                                   record.result === 'loss' ? '失败' : '平局';
+                const coinsClass = record.coins_change >= 0 ? 'coins-positive' : 'coins-negative';
+                const coinsText = record.coins_change >= 0 ? `+${record.coins_change}` : record.coins_change;
+                const modeText = record.game_mode === 'online' ? '联机' : '单机';
+                const time = new Date(record.created_at).toLocaleString('zh-CN');
+
+                return `
+                    <tr>
+                        <td>${time}</td>
+                        <td class="${resultClass}">${resultText}</td>
+                        <td class="${coinsClass}">${coinsText}</td>
+                        <td>${modeText}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateSummary(history) {
+            if (!history || history.length === 0) {
+                return;
+            }
+
+            const totalGames = history.length;
+            const winCount = history.filter(r => r.result === 'win').length;
+            const lossCount = history.filter(r => r.result === 'loss').length;
+            const winRate = totalGames > 0 ? ((winCount / totalGames) * 100).toFixed(1) : '0.0';
+
+            document.getElementById('totalGames').textContent = totalGames;
+            document.getElementById('winCount').textContent = winCount;
+            document.getElementById('lossCount').textContent = lossCount;
+            document.getElementById('winRate').textContent = winRate + '%';
+        }
+
+        // 加载历史记录
+        loadHistory();
+    </script>
+</body>
+</html>
